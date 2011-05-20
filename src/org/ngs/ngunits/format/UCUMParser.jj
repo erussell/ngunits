@@ -1,0 +1,179 @@
+options {
+  STATIC = false;
+  DEBUG_PARSER = false;
+  DEBUG_LOOKAHEAD = false;
+  DEBUG_TOKEN_MANAGER = false;
+}
+
+PARSER_BEGIN(UCUMParser)
+
+package org.ngs.ngunits.format;
+
+/**
+ * <p> 
+ * Parser definition for parsing {@link org.ngs.ngunits.Unit Unit}s 
+ * according to the <a href="http://aurora.regenstrief.org/~ucum/ucum.html">
+ * Uniform Code for Units of Measure</a>.
+ * 
+ * @see <a href="http://aurora.regenstrief.org/~ucum/ucum.html">UCUM</a>
+ */
+class UCUMParser {
+    
+    private SymbolMap _symbols;
+    
+    public UCUMParser (SymbolMap symbols, java.io.Reader in) {
+        this(in);
+        _symbols = symbols;
+    }
+}
+
+PARSER_END(UCUMParser)
+
+//
+// Lexical entities
+//
+
+TOKEN: { <#ATOM_CHAR: ["!","#"-"'","*",",","0"-"Z","\\","^"-"z","|","~"] >
+       | <#ESCAPED_ATOM_CHAR: ["!"-"Z","\\","^"-"~"] >
+       | <#TERMINAL_ATOM_CHAR: ["!","#"-"'","*",",",":"-"Z","\\","^"-"z","|","~"] >
+       | <#LCBRACKET: "{" >
+       | <#RCBRACKET: "}" >
+       | <#LSBRACKET: "[" >
+       | <#RSBRACKET: "]" > }
+TOKEN: { <ANNOTATION: <LCBRACKET> (["!"-"z","|","~" ])* <RCBRACKET> > }
+TOKEN: { <FACTOR: (["0"-"9"])+ > }
+TOKEN: { <SIGN: ["+","-"] > }
+TOKEN: { <DOT: "."> }
+TOKEN: { <SOLIDUS: "/"> }
+TOKEN: { <ATOM: (((<ATOM_CHAR>)*
+                  (<TERMINAL_ATOM_CHAR>)+) |
+                 ((<ATOM_CHAR>)*
+                  (<LSBRACKET> (<ESCAPED_ATOM_CHAR>)+ <RSBRACKET>)
+                  ((<ATOM_CHAR>)*
+                   (<TERMINAL_ATOM_CHAR>)+)?)) > }
+
+//
+// Parser productions
+//
+
+org.ngs.ngunits.Unit parseUnit () :
+    {
+        org.ngs.ngunits.Unit u;
+    }
+{
+    u=Term() <EOF>
+    { return u; }
+}
+
+org.ngs.ngunits.Unit Term () :
+    { 
+        org.ngs.ngunits.Unit result = org.ngs.ngunits.unit.DefaultUnitDelegate.INSTANCE.one();
+        org.ngs.ngunits.Unit temp = org.ngs.ngunits.unit.DefaultUnitDelegate.INSTANCE.one(); 
+    }
+{
+(
+    result=Component() 
+    ( 
+      (<DOT> temp=Component() { result = result.multiply(temp); })
+      | 
+      (<SOLIDUS> temp=Component() { result = result.divide(temp); })
+    )*
+    {
+        return result;
+    }
+)
+}
+
+org.ngs.ngunits.Unit Component () :
+    {
+        org.ngs.ngunits.Unit result = org.ngs.ngunits.unit.DefaultUnitDelegate.INSTANCE.one();
+        Token token = null;
+    }
+{
+(
+    LOOKAHEAD(Annotatable() <ANNOTATION>)
+    result=Annotatable() token=<ANNOTATION>
+    { 
+        return ((org.ngs.ngunits.unit.AbstractUnit)result).annotate(token.image.substring(1, token.image.length()-1));
+    }
+|
+    result=Annotatable()
+    {
+        return result; 
+    }
+|
+    token=<ANNOTATION>
+    {   
+        // Someday we should be able to do this:
+        // return result.annotate(token.image.substring(1, token.image.length()-1));
+        
+        return result;
+    }
+|
+    token=<FACTOR>
+    { 
+        long factor = Long.parseLong(token.image);
+        if (factor != 1) {
+            return result.multiply(factor); 
+        } else {
+            return result;
+        }
+    }
+|
+    <SOLIDUS> result=Component()
+    {
+        return org.ngs.ngunits.unit.DefaultUnitDelegate.INSTANCE.one().divide(result);
+    }
+|
+    "(" result=Term() ")"
+    {
+        return result; 
+    }
+)
+}
+
+org.ngs.ngunits.Unit Annotatable () :
+    {
+        org.ngs.ngunits.Unit result = org.ngs.ngunits.unit.DefaultUnitDelegate.INSTANCE.one();
+        Token token1 = null;
+        Token token2 = null;
+    }
+{
+(
+    LOOKAHEAD(SimpleUnit() (<SIGN>)? <FACTOR>)
+    result=SimpleUnit() (token1=<SIGN>)? token2=<FACTOR>
+    {
+        int exponent = Integer.parseInt(token2.image);
+        if ((token1 != null) && token1.image.equals("-")) {
+            return result.pow(-exponent);
+        } else {
+            return result.pow(exponent);
+        }
+    }
+|
+    result=SimpleUnit()
+    { 
+        return result; 
+    }
+)
+}
+
+org.ngs.ngunits.Unit SimpleUnit () :
+    {
+        Token token = null;
+    }
+{
+(
+    token=<ATOM>
+    {
+		org.ngs.ngunits.format.SymbolMap.Entry entry = _symbols.lookup(token.image);
+        if (entry == null) {
+            throw new ParseException();
+      	} else if (entry.prefix != null) {
+      	  	return entry.unit.transform(entry.prefix.converter);
+        } else {
+            return entry.unit;
+        }
+    }
+)
+}

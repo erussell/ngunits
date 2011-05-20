@@ -1,0 +1,59 @@
+<project name="Units" default="jar" basedir=".">
+	
+    <target name="init">
+        <tstamp/>
+        <property name="src" value="src" />
+        <property name="bin" value="bin" />
+        <property name="lib" value="lib" />
+        <property name="encoding" value="UTF-8" />
+        <property name="classpath" value="" />
+        <property file="${basedir}/version.properties" />
+    </target>
+    
+    <target name="javacc" depends="init">
+        <javacc target="${src}/org/ngs/ngunits/format/UnitParser.jj"
+                javacchome="${lib}" />
+        <javacc target="${src}/org/ngs/ngunits/format/UCUMParser.jj"
+                javacchome="${lib}" />
+    </target>
+	
+	<target name="compile" depends="javacc">
+	    <javac srcdir="${src}"
+	           destdir="${bin}" 
+	           classpath="${classpath}" 
+	 	   	   compiler="modern"
+	           source="1.5"
+	           target="1.5"
+	           debug="off"
+	           debuglevel="source,lines">
+	      <include name="/**/*.java" />
+	      <exclude name="**/*.old.java" />
+	    </javac>
+	    <copy todir="${bin}">
+	      <fileset dir="${src}" 
+	           includes="**/*.*"
+	           excludes="**/*.java" />
+	    </copy>
+	</target>
+	
+	<target name="jar" depends="compile">
+		<buildnumber />
+	    <jar jarfile="${lib}/ngunits-${build.version}.jar"
+	         basedir="${bin}" 
+	         includes="**/*.*"
+	         compress="false"
+	         index="true" />
+	</target>
+	
+    <target name="clean" depends="init">
+    	<delete>
+    		<fileset dir="${src}/org/ngs/ngunits/format"
+					 includes="UnitParser*.java" />
+    		<fileset dir="${src}/org/ngs/ngunits/format"
+    			     includes="UCUMParser*.java" />
+    		<fileset dir="${src}/org/ngs/ngunits/format"
+    			     includes="Token*.java" />
+    	</delete>
+    </target>
+	
+</project>
