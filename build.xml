@@ -27,8 +27,6 @@
 	           target="1.5"
 	           debug="off"
 	           debuglevel="source,lines">
-	      <include name="/**/*.java" />
-	      <exclude name="**/*.old.java" />
 	    </javac>
 	    <copy todir="${bin}">
 	      <fileset dir="${src}" 
