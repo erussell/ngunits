@@ -25,6 +25,7 @@
 	 	   	   compiler="modern"
 	           source="1.5"
 	           target="1.5"
+		   encoding="UTF-8"
 	           debug="off"
 	           debuglevel="source,lines">
 	    </javac>
