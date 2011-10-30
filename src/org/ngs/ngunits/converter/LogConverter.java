@@ -55,7 +55,7 @@ public abstract class LogConverter extends AbstractUnitConverter
         }
         
         public double convert (double value) {
-            return Math.log(value) / _logOfBase;
+            return Math.exp(value * _logOfBase);
         }
     }
 }
